@@ -1,32 +1,46 @@
-# Siren: Language Model Based Text-to-Audio Generation via Anti-Causally Aligned Collaborative Residual Transformers (EMNLP 2025)
+# Siren
 
-[![venue](https://img.shields.io/badge/EMNLP-2025-blue.svg?style=flat-square)](https://aclanthology.org/2025.emnlp-main.1322/)
-[![paper](https://img.shields.io/badge/ACL_Anthology-2025.emnlp--main.1322-b31b1b.svg?style=flat-square)](https://aclanthology.org/2025.emnlp-main.1322/)
+Autoregressive language-model approaches to text-to-audio generation, from The Hong Kong Polytechnic University and Alibaba Group.
+
 [![python](https://img.shields.io/badge/Python-3.10+-brightgreen.svg?style=flat-square)](https://www.python.org/)
 [![pytorch](https://img.shields.io/badge/PyTorch-2.1+-ee4c2c.svg?style=flat-square&logo=pytorch)](https://pytorch.org/)
 
-Official implementation of [**Language Model Based Text-to-Audio Generation: Anti-Causally Aligned Collaborative Residual Transformers**](https://aclanthology.org/2025.emnlp-main.1322/), EMNLP 2025 Main Conference.
+### Papers
+
+**Language Model Based Text-to-Audio Generation: Anti-Causally Aligned Collaborative Residual Transformers**
+[![venue](https://img.shields.io/badge/EMNLP-2025-blue.svg?style=flat-square)](https://aclanthology.org/2025.emnlp-main.1322/)
+[![paper](https://img.shields.io/badge/ACL_Anthology-2025.emnlp--main.1322-b31b1b.svg?style=flat-square)](https://aclanthology.org/2025.emnlp-main.1322/)
 
 Adding RVQ layers improves audio reconstruction fidelity but exceeds the generation capacity of a conventional LM. Siren splits the 12 residual codebooks of a DAC tokenizer across six isolated transformers, each learning a narrower objective, while accumulated conditions preserve the codec's coarse-to-fine dependency structure.
+
+**Guided by the Plan: Enhancing Faithful Autoregressive Text-to-Audio Generation with Guided Decoding**
+[![venue](https://img.shields.io/badge/EACL-2026-blue.svg?style=flat-square)](https://aclanthology.org/2026.eacl-long.138/)
+[![paper](https://img.shields.io/badge/ACL_Anthology-2026.eacl--long.138-b31b1b.svg?style=flat-square)](https://aclanthology.org/2026.eacl-long.138/)
+[![arXiv](https://img.shields.io/badge/arXiv-2601.14304-b31b1b.svg?style=flat-square&logo=arXiv)](https://arxiv.org/abs/2601.14304)
+
+The early prefix tokens of an AR audio generator implicitly encode global semantic attributes of the final output, such as event count and sound-object category — a form of implicit planning. Plan-Critic is a lightweight auxiliary model, trained with a GAE-inspired objective, that predicts final instruction-following quality from partial generations. At inference it prunes low-fidelity prefixes early and reallocates computation to high-potential planning seeds, improving CLAP score by up to 10 points over the AR baseline at parity with best-of-N decoding.
 
 <hr>
 
 ## What this repository contains
 
-This release covers the **Stage-1 supervised training pipeline**: data preparation, model definition, and per-expert training.
+Code for the **Siren Stage-1 supervised training pipeline**: data preparation, model definition, and per-expert training.
 
 - **Included** — Stage-1 training, resumable checkpointing, validation, data preparation from audio and captions.
-- **Not included** — the anti-causal alignment stage (reinforcement learning). The metrics reported in the paper depend on it, so they are not reproducible from this code alone.
+- **Not included** — Siren's anti-causal alignment stage (reinforcement learning), and the Plan-Critic guided decoding of the EACL 2026 paper. Reported metrics for both papers depend on components that are not in this repository.
 - **Checkpoints** — not released. Training runs from scratch with the configs in `configs/`.
 
 - [ ] Anti-causal alignment (RL) stage
+- [ ] Plan-Critic guided decoding (EACL 2026)
 - [ ] Pretrained checkpoints
 
 <hr>
 
 ## Method
 
-The paper identifies two properties of RVQ that break a single monolithic LM: features are near-orthogonal across layers, which impedes training, and semantic richness descends with codebook depth, which worsens exposure bias during autoregressive decoding.
+Everything below documents the Siren Stage-1 code in this repository.
+
+The EMNLP 2025 paper identifies two properties of RVQ that break a single monolithic LM: features are near-orthogonal across layers, which impedes training, and semantic richness descends with codebook depth, which worsens exposure bias during autoregressive decoding.
 
 Siren therefore assigns each expert one adjacent codebook pair. Expert `k` additionally receives the accumulated embeddings of every codebook below `2k`, which is what keeps the collaboration causal.
 
@@ -87,7 +101,7 @@ siren prepare-data \
   --device cuda --max-seq-len 300
 ```
 
-Audio must already be 16 kHz. A mismatched rate is rejected rather than resampled, because codes produced at a different rate are not comparable. The paper crops 6-second caption-aligned segments, which is 300 frames at the DAC frame rate; `--max-seq-len` truncates from the start, so perform the cropping in your own source manifest to match the paper.
+Audio must already be 16 kHz. A mismatched rate is rejected rather than resampled, because codes produced at a different rate are not comparable. Siren crops 6-second caption-aligned segments, which is 300 frames at the DAC frame rate; `--max-seq-len` truncates from the start, so perform the cropping in your own source manifest to match the paper.
 
 Datasets are not redistributed here.
 
@@ -106,7 +120,7 @@ siren train --config configs/siren_1_6b.json \
   --save-every 1000 --val-every 1000
 ```
 
-`--dac-model` injects and freezes the 12 DAC decode embeddings that produced your codes; only the projector and transformer train. The paper uses AdamW at `3e-4` with batch 24 per GPU.
+`--dac-model` injects and freezes the 12 DAC decode embeddings that produced your codes; only the projector and transformer train. Siren uses AdamW at `3e-4` with batch 24 per GPU.
 
 To print the six per-expert commands, or launch them across GPUs:
 
@@ -146,18 +160,20 @@ Checkpoints use `safetensors` plus a JSON sidecar, so nothing is ever unpickled.
 | `configs/siren_3_1b.json` | 24 | 8 | 515M | 3.09B |
 | `configs/tiny.json` | 2 | 1 | — | CPU tests only |
 
-Both paper configurations use a 1024-dimensional hidden space. `--allow-random-codebooks` substitutes random DAC embeddings for tests only; real training must pass `--dac-model`.
+Both Siren configurations use a 1024-dimensional hidden space. `--allow-random-codebooks` substitutes random DAC embeddings for tests only; real training must pass `--dac-model`.
 
 <hr>
 
 ## Results
 
-Reported on the AudioCaps test set, from Table 1 of the paper. These require the anti-causal alignment stage, which this repository does not implement.
+Reported on the AudioCaps test set, from Table 1 of the EMNLP 2025 paper. These require the anti-causal alignment stage, which this repository does not implement.
 
 | Model | FAD ↓ | FD ↓ | ISC ↑ | KL ↓ | CLAP ↑ |
 | --- | --- | --- | --- | --- | --- |
 | Siren 1.6B | 1.35 | 10.65 | 12.85 | 1.33 | 24.18 |
 | Siren 3.1B | **1.28** | **10.35** | **13.93** | 1.36 | **25.64** |
+
+The EACL 2026 paper reports a further improvement of up to 10 CLAP points over the AR baseline through Plan-Critic guided decoding; see that paper for its evaluation protocol.
 
 <hr>
 
@@ -181,6 +197,8 @@ src/siren/
 
 ## Citation
 
+If you use this code, please cite the Siren paper:
+
 ```bibtex
 @inproceedings{wang-etal-2025-language-model,
     title     = "Language Model Based Text-to-Audio Generation: Anti-Causally Aligned Collaborative Residual Transformers",
@@ -191,6 +209,22 @@ src/siren/
     pages     = "26025--26043",
     doi       = "10.18653/v1/2025.emnlp-main.1322",
     url       = "https://aclanthology.org/2025.emnlp-main.1322/"
+}
+```
+
+For the guided decoding method:
+
+```bibtex
+@inproceedings{wang-etal-2026-guided,
+    title     = "Guided by the Plan: Enhancing Faithful Autoregressive Text-to-Audio Generation with Guided Decoding",
+    author    = "Wang, Juncheng and Hu, Zhe and Xu, Chao and Ren, Siyue and Feng, Yuxiang and Liu, Yang and Sun, Baigui and Wang, Shujun",
+    booktitle = "Proceedings of the 19th Conference of the European Chapter of the Association for Computational Linguistics (Volume 1: Long Papers)",
+    year      = "2026",
+    address   = "Rabat, Morocco",
+    publisher = "Association for Computational Linguistics",
+    pages     = "3005--3018",
+    doi       = "10.18653/v1/2026.eacl-long.138",
+    url       = "https://aclanthology.org/2026.eacl-long.138/"
 }
 ```
 
