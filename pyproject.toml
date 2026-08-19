@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "siren"
+version = "0.1.0"
+description = "Siren: Stage 1 collaborative residual transformers for text-to-audio generation (EMNLP 2025)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "safetensors>=0.4",
+  "torch>=2.1",
+]
+
+[project.optional-dependencies]
+# Only needed to build data from raw audio and captions.
+audio = [
+  "descript-audio-codec>=1.0.0",
+  "soundfile>=0.12",
+  "transformers>=4.37,<5",
+]
+
+[project.scripts]
+siren = "siren.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

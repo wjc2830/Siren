@@ -1,0 +1,20 @@
+{
+  "dim": 1024,
+  "n_heads": 16,
+  "n_kv_heads": 16,
+  "spatial_layers": 24,
+  "factorized_layers": 8,
+  "prompt_dim": 768,
+  "num_codebooks": 12,
+  "num_experts": 6,
+  "codebook_size": 1024,
+  "dac_code_dim": 8,
+  "dac_feature_dim": 1024,
+  "max_seq_len": 2048,
+  "max_prompt_len": 128,
+  "ffn_multiple_of": 256,
+  "ffn_multiplier": null,
+  "norm_eps": 0.00001,
+  "dropout": 0.1,
+  "initializer_range": 0.02
+}
